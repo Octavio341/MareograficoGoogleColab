@@ -66,13 +66,13 @@ def super_resumen(archivos_lista):
     salida_proceso = widgets.Output()
     #Button de descarga de archivo TOGA
     def descargar_zip(b):
-        zip_filename = "mis_archivos.zip"
+        zip_filename = "mis_archivos_TOGA_nuevo formtao.zip"
         with zipfile.ZipFile(zip_filename, 'w') as zipf:
             for archivo in archivos_seleccionados:
                 if os.path.exists(archivo):
                     #print("Procesando:", archivo)
                     # Crear nombre único de salida
-                    nombre_salida = os.path.splitext(os.path.basename(archivo))[0] + "_procesado.txt"
+                    nombre_salida = os.path.splitext(os.path.basename(archivo))[0] + "_procesado.dat"
                     ruta_salida = os.path.join(tempfile.gettempdir(), nombre_salida)
 
                     with open(ruta_salida, 'w+') as archivo_salida:
