@@ -93,15 +93,19 @@ print("***** Inicio de la revision del archivo *****")
 ###################################################
 # Revisi'on de numero correcto de l'ineas de datos#
 ###################################################
+anio_datos = int(fecha[:4])
+if es_bisiesto(anio_datos):
+    dias_esperados=366*2
+    print(f"ESTE ARCHIVO CONTIENE REGISTROS DE 366 dias")
+else:
+    dias_esperados=365*2
+    print(f"ESTE ARCHIVO CONTIENE REGISTROS DE 365 dias ")
 
 print("Comprobando que el archivo contenga el numero correcto de lineas de datos ",end = '')
 
 # Calcular cu'antas lineas de datos se esperan
-anio_datos = int(fecha[:4])
-if es_bisiesto(anio_datos):
-    dias_esperados=366*2
-else:
-    dias_esperados=365*2
+
+
 
 if len(matriz_toga.index) == dias_esperados:
     print("[OK]")

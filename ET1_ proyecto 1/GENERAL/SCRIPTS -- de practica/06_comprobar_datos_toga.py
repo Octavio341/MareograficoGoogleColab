@@ -138,3 +138,5 @@ else:
 ###################################################
 datos_validos=(dias_faltantes+dias_existentes)*12-matriz_toga.isna().sum().sum()
 print("Hay "+str(datos_validos)+" datos validos ("+str("{0:.2f}".format(datos_validos*100/((dias_faltantes+dias_existentes)*12)))+"%) y "+str(matriz_toga.isna().sum().sum())+" datos nulos ("+str("{0:.2f}".format(matriz_toga.isna().sum().sum()*100/((dias_faltantes+dias_existentes)*12)))+"%)")
+total = datos_validos + matriz_toga.isna().sum().sum()
+print(f"EN TOTAL EXISTE {total} datos")

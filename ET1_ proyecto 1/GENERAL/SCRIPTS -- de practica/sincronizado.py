@@ -76,17 +76,122 @@ def super_resumen(archivos_lista):
                     ruta_salida = os.path.join(tempfile.gettempdir(), nombre_salida)
 
                     with open(ruta_salida, 'w+') as archivo_salida:
-                        archivo_salida.write("Contenido de prueba\n")
+                        archivo_salida.write("Nuevo formato \n")
                         with salida_proceso:
                           print("✅ Archivo creado en:", ruta_salida)
 
                         # Escribir datos
+                        #####################################################################
+                        lista_fechas.clear()
+                        lista_datos.clear()
+                        lista_etiquetas.clear()
+
+                        matriz_toga = pd.read_csv(archivo,sep=r'\s+',names=["StationID","StationName","Date","D1","D2","D3","D4","D5","D6","D7","D8","D9","D10","D11","D12"],engine='python', skiprows=1, na_values="9999")
+
+                        for filas_dat in matriz_toga.index:
+                          fecha = str(matriz_toga["Date"][filas_dat])
+                          #fecha es =  195701011
+                          if fecha[8:9]== "1": # seleccionamos dia
+                            fecha_inicial = datetime.datetime(int(fecha[:4]),int(fecha[4:6]),int(fecha[6:8]))
+                            # fecha_inicial es = 1955-08-25 00:00:00
+                          else:
+                            fecha_inicial = datetime.datetime(int(fecha[:4]),int(fecha[4:6]),int(fecha[6:8]),12)
+                            #fecha inicial es = 1960-01-01 12:00:00
+                          for dat in ["D1", "D2", "D3", "D4",  "D5", "D6", "D7", "D8", "D9", "D10", "D11", "D12"]:
+                            lista_fechas.append(fecha_inicial)
+                            lista_datos.append(matriz_toga[dat][filas_dat])
+                            lista_etiquetas.append(0)
+                            #lista_datos.append(matriz_toga[dat][archivo])      #AGRAGMOS LAS LISTA ETIQUETAS
+                            fecha_inicial=fecha_inicial+datetime.timedelta(hours=1)
+                             
+
+                        # Recorrer todo el arreglo de datos
+                        stuckvalue = lista_datos[0]
+                        stucktotal = 0
+                        for ind in range(len(lista_datos)):
+
+                            # Comenzar a partir del segundo dato
+                            if ind > 0:
+
+                                # Verificar si el dato que se está revisando actualmente no es igual al stuckvalue
+                                if stuckvalue == lista_datos[ind] and ind-1 == stuckindex:
+                                    stuckcount = stuckcount + 1
+                                else:
+                                    stuckcount = 0
+
+                                if stuckcount >= stucklimit-1:
+
+                                    # Si se trata de los primeros tres valores, etiquetar los dos valores previos
+                                    if stuckcount == stucklimit-1:
+                                        for k in range(ind-(stucklimit-1), ind):
+                                            lista_etiquetas[k]=3
+                                            #print("---Se han encontrado y etiquetado valores iguales consecutivos (stuck values). Valor: "+str(lista_datos[k])+" Posicion: "+str(k))
+                                            lista_stuck_datos.append(lista_datos[k])
+                                            lista_stuck_fechas.append(lista_fechas[k])
+                                        stucktotal = stucktotal + 1
+                                    
+                                    # Etiquetar el stuckvalue actual
+                                    lista_etiquetas[ind]=3
+                                    #print("---Se han encontrado y etiquetado valores iguales consecutivos (stuck values). Valor: "+str(lista_datos[ind])+" Posicion: "+str(ind))
+                                    lista_stuck_datos.append(lista_datos[ind])
+                                    lista_stuck_fechas.append(lista_fechas[ind])
+
+                                stuckvalue = lista_datos[ind]
+                                stuckindex = ind
+
+                        contadorpicos = 0
+                        spikedetected = True    # Bandera de que un pico ha sido detetado
+                        splinedegree = 2        # Grado del spline que ser'a ajustado
+                        winsize = 200           # Tamanio de la ventana
+                        maxiter = 1             # N'umero m'aximo de iteraciones
+                        nsigma = 4              # Valor de sigma a considerar
+                        iter = 0                # N'umero de iteraci'on actual
+
+                        # Funci'on que obtiene el RMSE
+                        def rmse(predictions, targets):
+                                return np.sqrt(((predictions - targets) ** 2).mean()) 
+
+                        # Crear la lista de indices con elementos de punto flotante
+                        lista_indices = list()
+                        for i in range(len(lista_datos)):
+                            lista_indices.append(float(i))
+
+                        while spikedetected and iter < maxiter:
+                            spikedetected = False                   # Si no se detecta ning'un pico en la primer iteracion, ya no se hace la segunda
+                            for ix in range(len(lista_datos)):      # ix recorrer'a todos los indices de la lista de datos
+                                if (ix < winsize/2):                # Si el indice est'a dentro de los primeros 100 valores
+                                    ini=0
+                                    end=winsize-1
+                                    winix = ix
+                                elif (ix > len(lista_datos) - winsize/2):   # Si el 'indice esta en los 'ultimos 100 datos
+                                    ini=len(lista_datos)-winsize
+                                    end=len(lista_datos)-1
+                                    winix = (winsize-1)-(end-ix+1)
+                                else:                                       # Si el 'indice no est'a ni en los primeros ni en los 'ultimos 100 datos
+                                    ini = int(ix - winsize/2)
+                                    end = int(ix + winsize/2)
+                                    winix = int(winsize/2)
+                                winx = lista_indices[ini:end]
+                                windata = lista_datos[ini:end]
+
+                                splinefit = np.polyfit(winx, windata, splinedegree)
+                                splinedata = np.polyval(splinefit, winx)
+                                rmse_val = rmse(splinedata, windata) #¿Usar np.array?
+                                if (abs(splinedata[winix]-lista_datos[ix]) >= nsigma*rmse_val):
+                                        print ("Se ha encontrado un pico en la posicion "+str(ix)+" y el valor es "+str(lista_datos[ix]))
+                                        lista_etiquetas[ix] = 8 
+                                        spikedetected = True
+                                        contadorpicos = contadorpicos + 1
+                            iter=iter+1
+                        #####################################################################
+
                         for ind in range(len(lista_datos)):
                             archivo_salida.write(
                                 lista_fechas[ind].strftime("%Y-%m-%d %H:%M:%S") + " " +
                                 str(lista_datos[ind]) + " " +
                                 str(lista_etiquetas[ind]) + "\n"
                             )
+                        
                     ######################========= LOGICA DE =============###############################
                     zipf.write(ruta_salida, os.path.basename(ruta_salida))
                 else:
@@ -124,6 +229,18 @@ def super_resumen(archivos_lista):
         mensajes = []
         mensajes.append(f"Procesando: {nombre}")
         bloque_texto = "<br>".join(mensajes)
+
+        try:
+            df = pd.read_csv(io.StringIO(contenido), sep='\t')  # ajustar separador según tu archivo
+            if df.empty:
+                mensajes.append("⚠️ El archivo se leyó pero no tiene filas de datos.")
+                bloque_texto = "<br>".join(mensajes)
+            else:
+                mensajes.append(f"✅ El archivo tiene {len(df)} filas y {len(df.columns)} columnas.")
+                bloque_texto = "<br>".join(mensajes)
+        except Exception as e:
+            mensajes.append(f"❌ Error al leer el archivo: {e}")
+            bloque_texto = "<br>".join(mensajes)
     
         matriz_toga = pd.read_csv(io.StringIO(contenido),
                             sep=r'\s+',
@@ -151,84 +268,7 @@ def super_resumen(archivos_lista):
             #lista_datos.append(matriz_toga[dat][archivo])      #AGRAGMOS LAS LISTA ETIQUETAS
             fecha_inicial=fecha_inicial+datetime.timedelta(hours=1)
         ################################################# ANALISIS 
-        # Recorrer todo el arreglo de datos
-        stuckvalue = lista_datos[0]
-        stucktotal = 0
-        for ind in range(len(lista_datos)):
-
-            # Comenzar a partir del segundo dato
-            if ind > 0:
-
-                # Verificar si el dato que se está revisando actualmente no es igual al stuckvalue
-                if stuckvalue == lista_datos[ind] and ind-1 == stuckindex:
-                    stuckcount = stuckcount + 1
-                else:
-                    stuckcount = 0
-
-                if stuckcount >= stucklimit-1:
-
-                    # Si se trata de los primeros tres valores, etiquetar los dos valores previos
-                    if stuckcount == stucklimit-1:
-                        for k in range(ind-(stucklimit-1), ind):
-                            lista_etiquetas[k]=3
-                            #print("---Se han encontrado y etiquetado valores iguales consecutivos (stuck values). Valor: "+str(lista_datos[k])+" Posicion: "+str(k))
-                            lista_stuck_datos.append(lista_datos[k])
-                            lista_stuck_fechas.append(lista_fechas[k])
-                        stucktotal = stucktotal + 1
-                    
-                    # Etiquetar el stuckvalue actual
-                    lista_etiquetas[ind]=3
-                    #print("---Se han encontrado y etiquetado valores iguales consecutivos (stuck values). Valor: "+str(lista_datos[ind])+" Posicion: "+str(ind))
-                    lista_stuck_datos.append(lista_datos[ind])
-                    lista_stuck_fechas.append(lista_fechas[ind])
-
-                stuckvalue = lista_datos[ind]
-                stuckindex = ind
-
-        contadorpicos = 0
-        spikedetected = True    # Bandera de que un pico ha sido detetado
-        splinedegree = 2        # Grado del spline que ser'a ajustado
-        winsize = 200           # Tamanio de la ventana
-        maxiter = 1             # N'umero m'aximo de iteraciones
-        nsigma = 4              # Valor de sigma a considerar
-        iter = 0                # N'umero de iteraci'on actual
-
-        # Funci'on que obtiene el RMSE
-        def rmse(predictions, targets):
-                return np.sqrt(((predictions - targets) ** 2).mean()) 
-
-        # Crear la lista de indices con elementos de punto flotante
-        lista_indices = list()
-        for i in range(len(lista_datos)):
-            lista_indices.append(float(i))
-
-        while spikedetected and iter < maxiter:
-            spikedetected = False                   # Si no se detecta ning'un pico en la primer iteracion, ya no se hace la segunda
-            for ix in range(len(lista_datos)):      # ix recorrer'a todos los indices de la lista de datos
-                if (ix < winsize/2):                # Si el indice est'a dentro de los primeros 100 valores
-                    ini=0
-                    end=winsize-1
-                    winix = ix
-                elif (ix > len(lista_datos) - winsize/2):   # Si el 'indice esta en los 'ultimos 100 datos
-                    ini=len(lista_datos)-winsize
-                    end=len(lista_datos)-1
-                    winix = (winsize-1)-(end-ix+1)
-                else:                                       # Si el 'indice no est'a ni en los primeros ni en los 'ultimos 100 datos
-                    ini = int(ix - winsize/2)
-                    end = int(ix + winsize/2)
-                    winix = int(winsize/2)
-                winx = lista_indices[ini:end]
-                windata = lista_datos[ini:end]
-
-                splinefit = np.polyfit(winx, windata, splinedegree)
-                splinedata = np.polyval(splinefit, winx)
-                rmse_val = rmse(splinedata, windata) #¿Usar np.array?
-                if (abs(splinedata[winix]-lista_datos[ix]) >= nsigma*rmse_val):
-                        print ("Se ha encontrado un pico en la posicion "+str(ix)+" y el valor es "+str(lista_datos[ix]))
-                        lista_etiquetas[ix] = 8 
-                        spikedetected = True
-                        contadorpicos = contadorpicos + 1
-            iter=iter+1
+        
         ############################################################# ----FIN
         # Crear la fecha de control
         fecha = str(matriz_toga["Date"][0])
@@ -332,10 +372,10 @@ def super_resumen(archivos_lista):
             salida_grafico,
             widgets.VBox([
                 widgets.HBox([checkbox, widgets.HTML(f"<b>📄 {nombre}</b>")]),
-                widgets.HTML(f"<div style='font-family:Courier New, monospace; font-size:13px; color:#2D6FA4; height:200px;width:500px'>{bloque_texto}</div>")
+                widgets.HTML(f"<div style='font-family:Courier New, monospace; font-size:13px; color:#2D6FA4; height:200px;width:800px'>{bloque_texto}</div>")
             ])
         ], layout=widgets.Layout(border="2px solid #2D6FA4", border_radius="10px",
-                                padding="10px", margin="5px", width="1100px",align_items="flex-start"))
+                                padding="10px", margin="5px", width="1180px",align_items="flex-start"))
         #display(contenedor_final
         contenedor_final.layout.flex = "0 0 auto"
         contenedor_general.append(contenedor_final)  # acumulamos cada bloque
